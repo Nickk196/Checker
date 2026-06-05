@@ -1,201 +1,162 @@
-<#
-.SYNOPSIS
-    NEON TERMINAL // DEEP SYSTEM AUDIT
-.NOTES
-    Custom UI Logic // Socket Scanning // Driver Forensics
-#>
-
- $ErrorActionPreference = "SilentlyContinue"
-
-# --- CHECK PRIVILEGES ---
-if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "ACCESS DENIED: ADMIN RIGHTS REQUIRED." -ForegroundColor Red
-    Start-Sleep 2; exit
+ $isAdmin = [System.Security.Principal.WindowsPrincipal]::new([System.Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "`n╔══════════════════════════════════════════════════╗" -ForegroundColor Red
+    Write-Host "║           ADMINISTRATOR PRIVILEGES REQUIRED       ║" -ForegroundColor Red
+    Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Red
+    exit
 }
 
-# --- VISUAL FUNCTIONS ---
+Write-Host "made with love by lily<3" -ForegroundColor Cyan
+Write-Host ""
 
-function Draw-Box {
-    param([string]$Title, [string]$Color = "Cyan")
-    $width = 80
-    Write-Host "`n┌─ $Title " -NoNewline -ForegroundColor $Color
-    Write-Host ("─" * ($width - $Title.Length - 5)) -ForegroundColor $Color
-}
+# --- MODULE 1: NETWORK LISTENERS ---
+Write-Host "NETWORK LISTENERS" -ForegroundColor Cyan
 
-function Write-Status {
-    param([string]$Msg, [string]$Status)
-    $pad = 60 - $Msg.Length
-    Write-Host "  $Msg" -NoNewline -ForegroundColor White
-    Write-Host ("." * $pad) -NoNewline -ForegroundColor DarkGray
+try {
+    $listeners = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalAddress -notlike "127.0.0.1" -and $_.LocalAddress -notlike "::1" }
     
-    if ($Status -eq "OK")     { Write-Host " [✓]" -ForegroundColor Green }
-    elseif ($Status -eq "FAIL") { Write-Host " [✗]" -ForegroundColor Red }
-    elseif ($Status -eq "WARN") { Write-Host " [!]" -ForegroundColor Yellow }
-    else { Write-Host " [$Status]" -ForegroundColor Gray }
-}
-
-function Beep-Complete {
-    [console]::beep(800, 200)
-    Start-Sleep -m 100
-    [console]::beep(1200, 400)
-}
-
-# --- CORE SCANNING LOGIC ---
-
-function Test-LocalPorts {
-    Write-Host "  Scanning Local Sockets..." -ForegroundColor Gray
-    $commonPorts = @(21, 22, 80, 443, 8080, 3389, 5900, 445)
-    $openPorts = @()
-    
-    foreach ($port in $commonPorts) {
-        $tcp = New-Object System.Net.Sockets.TcpClient
-        try {
-            $tcp.Connect("127.0.0.1", $port)
-            $openPorts += $port
-            $tcp.Close()
-        } catch { }
-    }
-    return $openPorts
-}
-
-function Get-UnsignedDrivers {
-    # Checks for drivers without a digital signature (Malware risk)
-    $drivers = Get-WindowsDriver -Online | Where-Object { $_.OriginalFileName -like "*.sys" }
-    $unsigned = $drivers | Where-Object { $_.Signer -like "*unsigned*" -or $_.Signer -eq $null }
-    return $unsigned
-}
-
-function Get-NetworkListeners {
-    # See what executable is listening on ports
-    $listeners = Get-NetTCPConnection -State Listen | Select-Object -First 5
-    return $listeners
-}
-
-# --- MAIN EXECUTION ---
-
-Clear-Host
-Write-Host @"
- __  __  ____  ____  ____    ____   ___   _  _   ____  _   _ 
-|  \/  ||  _ \|  _ \|  _ \  / ___| / _ \ | || | |  _ \| | | |
-| |\/| || |_) | | | | | | | \___ \| | | || || |_| | | | |_| |
-| |  | ||  __/| |_| | |_| |  ___) | |_| ||__   _| |_| |  _  |
-|_|  |_||_|   |____/|____/  |____/ \___/   |_| |____/|_| |_|
-"@ -ForegroundColor Magenta
-Write-Host " [AUTONOMOUS DIAGNOSTIC PROTOCOL INITIATED] `n" -ForegroundColor Cyan
-
-# --- SECTION 1: FIRMWARE & OS ---
-Draw-Box "KERNEL & FIRMWARE"
- $os = Get-CimInstance Win32_OperatingSystem
-Write-Host "  OS    : $($os.Caption)" -ForegroundColor White
-Write-Host "  Build : $($os.BuildNumber)" -ForegroundColor Gray
-Write-Host "  Uptime: $((Get-Date) - $os.LastBootUpTime | Select-Object -ExpandProperty Days) Days" -ForegroundColor Gray
-
-# --- SECTION 2: SECURITY HOLE CHECKING ---
-Draw-Box "SECURITY AUDIT" "Yellow"
-
-# Check RDP
- $rdp = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server").fDenyTSConnections
-if ($rdp -eq 0) { Write-Status "Remote Desktop (RDP)" "FAIL (Open)" }
-else { Write-Status "Remote Desktop (RDP)" "OK" }
-
-# Check Guest Account
- $guest = Get-LocalUser -Name "Guest"
-if ($guest.Enabled) { Write-Status "Guest Account" "FAIL (Enabled)" }
-else { Write-Status "Guest Account" "OK" }
-
-# Check Admin Password Policy
- $passPolicy = Get-LocalUser | Where-Object { $_.SID -like "*-500" }
-if ($passPolicy.PasswordLastSet -eq $null) { Write-Status "Admin Password Set" "WARN" }
-else { Write-Status "Admin Password Set" "OK" }
-
-# --- SECTION 3: ACTIVE NETWORKING ---
-Draw-Box "NETWORK SURVEILLANCE" "Magenta"
-
- $ports = Test-LocalPorts
-Write-Host "  Open Common Ports: " -NoNewline -ForegroundColor Gray
-if ($ports.Count -gt 0) { Write-Host ($ports -join ", ") -ForegroundColor Yellow }
-else { Write-Host "None" -ForegroundColor Green }
-
-Write-Host "`n  ACTIVE LISTENERS (Top 5):" -ForegroundColor Gray
-Get-NetworkListeners | ForEach-Object {
-    $process = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
-    if ($process) {
-        Write-Host ("    Port: {0,5} -> " -f $_.LocalPort) -NoNewline -ForegroundColor White
-        Write-Host $process.ProcessName -ForegroundColor Cyan
-    }
-}
-
-# --- SECTION 4: DRIVER FORENSICS ---
-Draw-Box "DRIVER INTEGRITY" "Yellow"
-Write-Host "  Scanning System32 Drivers for Signatures..." -ForegroundColor Gray
- $badDrivers = Get-UnsignedDrivers
-
-if ($badDrivers) {
-    Write-Host "  [!] UNSIGNED DRIVERS DETECTED:" -ForegroundColor Red
-    $badDrivers | Select-Object -First 3 | ForEach-Object {
-        Write-Host ("    - " + $_.OriginalFileName) -ForegroundColor DarkRed
-    }
-} else {
-    Write-Status "Digital Signature Check" "OK"
-}
-
-# --- SECTION 5: PROCESS ANOMALIES ---
-Draw-Box "PROCESS ANOMALY DETECTION" "Green"
-
-# Check for processes masquerading (e.g., svchost.exe running from wrong path)
- $svchost = Get-Process -Name svchost -ErrorAction SilentlyContinue
-if ($svchost) {
-    $badPath = $false
-    foreach ($proc in $svchost) {
-        if ($proc.Path -notlike "*System32*") {
-            Write-Host "  [!] SUSPICIOUS SVCHOST: $($proc.Path)" -ForegroundColor Red
-            $badPath = $true
+    if ($listeners) {
+        Write-Host "  Active Listening Ports (External Facing):" -ForegroundColor White
+        foreach ($listener in $listeners) {
+            try {
+                $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+                $procName = if ($process) { $process.ProcessName } else { "Unknown" }
+                
+                Write-Host ("  {0,-8} {1,-40}" -f $listener.LocalPort, $procName) -ForegroundColor Green -NoNewline
+                Write-Host (" | {0}" -f $listener.LocalAddress) -ForegroundColor Yellow
+            } catch {
+                Write-Host ("  {0,-8} {1,-40}" -f $listener.LocalPort, "Access Denied") -ForegroundColor Red
+            }
         }
+    } else {
+        Write-Host "  No external listening ports found." -ForegroundColor Green
     }
-    if (-not $badPath) { Write-Status "Svchost Integrity" "OK" }
-} else {
-    Write-Status "Svchost Running" "OK" 
+} catch {
+    Write-Host "  Unable to retrieve network listeners." -ForegroundColor Red
 }
 
-# Check high CPU usage
- $highCpu = Get-Process | Where-Object { $_.CPU -gt 10 } | Select-Object -First 3
-if ($highCpu) {
-    Write-Host "  High Load Processes:" -ForegroundColor Yellow
-    $highCpu | ForEach-Object { Write-Host "    - $($_.Name) ($($_.CPU))" -ForegroundColor Gray }
+# --- MODULE 2: ACTIVE USERS ---
+Write-Host "`nACTIVE USER SESSIONS" -ForegroundColor Cyan
+
+try {
+    $users = Get-CimInstance -ClassName Win32_LoggedOnUser -ErrorAction SilentlyContinue | Select-Object -Unique
+    if ($users) {
+        Write-Host "  Logged in users:" -ForegroundColor White
+        foreach ($user in $users) {
+            $name = $user.Antecedent -replace '.+Domain="(.+?)".+', '$1'
+            $account = $user.Antecedent -replace '.+Name="(.+?)".+', '$1'
+            Write-Host ("  {0,-20} {1}" -f "$name\$account", $user.Dependent) -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  No user sessions detected." -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "  Unable to retrieve user sessions." -ForegroundColor Red
 }
 
-# --- SECTION 6: REGISTRY CHECKS ---
-Draw-Box "REGISTRY ARTIFACTS" "Cyan"
+# --- MODULE 3: STARTUP PERSISTENCE ---
+Write-Host "`nSTARTUP PERSISTENCE CHECK" -ForegroundColor Cyan
 
-# Persistence Keys
  $runKeys = @(
     "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
     "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 )
 
- $persistenceFound = $false
-foreach ($key in $runKeys) {
-    $items = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
-    if ($items.PSObject.Properties.Name -notcontains "PSPath") { continue }
-    
-    foreach ($prop in $items.PSObject.Properties) {
-        if ($prop.Name -notin @("PSPath","PSParentPath","PSChildName","PSDrive","PSProvider")) {
-            $val = $prop.Value
-            # Simple heuristics for weird looking paths
-            if ($val -like "*temp*" -or $val -like "*Downloads*") {
-                Write-Host "  [!] SUSPICIOUS STARTUP: $($prop.Name) -> $val" -ForegroundColor Red
-                $persistenceFound = $true
+ $suspicousFound = $false
+
+foreach ($keyPath in $runKeys) {
+    if (Test-Path $keyPath) {
+        $items = Get-Item -Path $keyPath
+        foreach ($item in $items.Property) {
+            $value = (Get-ItemProperty -Path $keyPath -Name $item).$item
+            $valueString = $value.ToString()
+            
+            # Heuristic: Check for AppData, Temp, or Downloads in startup path
+            if ($valueString -like "*AppData\Local\Temp*" -or $valueString -like "*Downloads*") {
+                $suspicousFound = $true
+                Write-Host ("  {0,-30} {1}" -f $item, $valueString) -ForegroundColor Red
             }
         }
     }
 }
-if (-not $persistenceFound) { Write-Status "Startup Locations" "OK" }
 
-# --- FINAL ---
-Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-Write-Host "║                    SCAN SEQUENCE COMPLETE                      ║" -ForegroundColor Magenta
-Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
+if (-not $suspicousFound) {
+    Write-Host "  No suspicious startup entries found." -ForegroundColor Green
+}
 
-Beep-Complete
-Write-Host "`nPress any key to terminate session..." -ForegroundColor DarkGray
- $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+# --- MODULE 4: UNSIGNED DRIVERS ---
+Write-Host "`nDRIVER INTEGRITY" -ForegroundColor Cyan
+
+try {
+    $drivers = Get-WindowsDriver -Online -ErrorAction SilentlyContinue | Where-Object { $_.OriginalFileName -like "*.sys" }
+    $unsignedDrivers = @()
+
+    foreach ($driver in $drivers) {
+        if ($driver.Signer -like "*unsigned*" -or $driver.Signer -eq $null) {
+            $unsignedDrivers += $driver
+        }
+    }
+
+    if ($unsignedDrivers.Count -gt 0) {
+        Write-Host ("  Unsigned Drivers Found: {0}" -f $unsignedDrivers.Count) -ForegroundColor Yellow
+        foreach ($driver in $unsignedDrivers) {
+            $name = $driver.OriginalFileName
+            if ($name.Length -gt 50) { $name = $name.Substring(0, 47) + "..." }
+            Write-Host ("    {0}" -f $name) -ForegroundColor Red
+        }
+    } else {
+        Write-Host "  All drivers are digitally signed." -ForegroundColor Green
+    }
+} catch {
+    Write-Host "  Unable to audit drivers." -ForegroundColor Red
+}
+
+# --- MODULE 5: PROCESS ANOMALIES ---
+Write-Host "`nPROCESS ANOMALY DETECTION" -ForegroundColor Cyan
+
+# Check for Svchost running outside of System32
+ $svchosts = Get-Process -Name svchost -ErrorAction SilentlyContinue
+if ($svchosts) {
+    $badPath = $false
+    foreach ($proc in $svchosts) {
+        if ($proc.Path -and $proc.Path -notlike "*System32*") {
+            Write-Host ("  {0,-20} {1}" -f "SUSPICIOUS SVCHOST", $proc.Path) -ForegroundColor Red
+            $badPath = $true
+        }
+    }
+    if (-not $badPath) {
+        Write-Host "  Svchost path integrity verified." -ForegroundColor Green
+    }
+} else {
+    Write-Host "  Svchost not running (Unusual)." -ForegroundColor Yellow
+}
+
+# Check for high CPU usage processes
+Write-Host "  Top CPU Consumers:" -ForegroundColor White
+ $topCPU = Get-Process | Sort-Object CPU -Descending | Select-Object -First 5
+foreach ($proc in $topCPU) {
+    $cpuTime = [math]::Round($proc.CPU, 2)
+    Write-Host ("  {0,-20} CPU: {1}" -f $proc.ProcessName, "$cpuTime sec") -ForegroundColor Yellow
+}
+
+# --- MODULE 6: HOST FILE INTEGRITY ---
+Write-Host "`nHOST FILE INTEGRITY" -ForegroundColor Cyan
+
+ $hostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
+if (Test-Path $hostsPath) {
+    $content = Get-Content $hostsPath | Where-Object { $_ -notmatch "^#" -and $_.trim() -ne "" }
+    $badEntries = $content | Where-Object { $_ -notmatch "^0.0.0.0" -and $_ -notmatch "^127.0.0.1" }
+    
+    if ($badEntries) {
+        Write-Host "  Suspicious Hosts Entries Found:" -ForegroundColor Red
+        foreach ($entry in $badEntries) {
+            Write-Host ("    {0}" -f $entry) -ForegroundColor White
+        }
+    } else {
+        Write-Host "  Hosts file appears clean." -ForegroundColor Green
+    }
+} else {
+    Write-Host "  Hosts file not found." -ForegroundColor Yellow
+}
+
+Write-Host "`nDeep Scan Complete, hit up @praiselily if u run into any issues." -ForegroundColor Cyan
