@@ -1,35 +1,34 @@
  $isAdmin = [System.Security.Principal.WindowsPrincipal]::new([System.Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host "`n╔══════════════════════════════════════════════════╗" -ForegroundColor Red
-    Write-Host "║           ADMINISTRATOR PRIVILEGES REQUIRED       ║" -ForegroundColor Red
-    Write-Host "║     Please run this script as Administrator!      ║" -ForegroundColor Red
-    Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Red
+    Write-Host "`n╔══════════════════════════════════════════════════╗" -ForegroundColor Magenta
+    Write-Host "║           ADMINISTRATOR PRIVILEGES REQUIRED       ║" -ForegroundColor Magenta
+    Write-Host "║     Please run this script as Administrator!      ║" -ForegroundColor Magenta
+    Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Magenta
     exit
 }
 
-Write-Host "made with love by lily<3" -ForegroundColor Cyan
+Write-Host "made with love by Nic<3" -ForegroundColor Magenta
 Write-Host ""
 
 try {
     $bootTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
     $uptime = (Get-Date) - $bootTime
-    Write-Host "SYSTEM BOOT TIME" -ForegroundColor Cyan
+    Write-Host "SYSTEM BOOT TIME" -ForegroundColor Magenta
     Write-Host ("  Last Boot: {0}" -f $bootTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
-    Write-Host ("  Uptime: {0} days, {1:D2}:{2:D2}:{3:D2}" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds) -ForegroundColor White
+    Write-Host ("  Uptime: {0} days, {1:D2}:{2:D2}:{3:D2}" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds) -ForegroundColor Cyan
 } catch {
     Write-Host "Unable to retrieve boot time information" -ForegroundColor Red
 }
 
-# --- NEW: NETWORK INFO ---
-Write-Host "`nNETWORK ADAPTERS" -ForegroundColor Cyan
+# --- NETWORK INFO (IP Removed) ---
+Write-Host "`nNETWORK ADAPTERS" -ForegroundColor Magenta
 try {
     $adapters = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null }
     if ($adapters) {
         foreach ($adapter in $adapters) {
             Write-Host ("  {0,-20} : {1}" -f "Interface", $adapter.InterfaceAlias) -ForegroundColor White
-            Write-Host ("  {0,-20} : {1}" -f "IP Address", ($adapter.IPv4Address.IPAddress)) -ForegroundColor Yellow
-            Write-Host ("  {0,-20} : {1}" -f "Gateway", ($adapter.IPv4DefaultGateway.NextHop)) -ForegroundColor Green
-            Write-Host "  ----------------------------------------" -ForegroundColor Gray
+            Write-Host ("  {0,-20} : {1}" -f "Gateway", ($adapter.IPv4DefaultGateway.NextHop)) -ForegroundColor Cyan
+            Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
         }
     } else {
         Write-Host "  No active internet connection found." -ForegroundColor Yellow
@@ -40,15 +39,15 @@ try {
 
  $drives = Get-CimInstance -ClassName Win32_LogicalDisk | Where-Object { $_.DriveType -ne 5 }
 if ($drives) {
-    Write-Host "`nCONNECTED DRIVES" -ForegroundColor Cyan
+    Write-Host "`nCONNECTED DRIVES" -ForegroundColor Magenta
     foreach ($drive in $drives) {
         $freeSpace = [math]::Round($drive.FreeSpace / 1GB, 2)
         $size = [math]::Round($drive.Size / 1GB, 2)
-        Write-Host ("  {0}: {1} ({2} GB Free / {3} GB Total)" -f $drive.DeviceID, $drive.FileSystem, $freeSpace, $size) -ForegroundColor Green
+        Write-Host ("  {0}: {1} ({2} GB Free / {3} GB Total)" -f $drive.DeviceID, $drive.FileSystem, $freeSpace, $size) -ForegroundColor Cyan
     }
 }
 
-Write-Host "`nSERVICE STATUS" -ForegroundColor Cyan
+Write-Host "`nSERVICE STATUS" -ForegroundColor Magenta
 
  $services = @(
     @{Name = "SysMain"; DisplayName = "SysMain"},
@@ -63,7 +62,7 @@ Write-Host "`nSERVICE STATUS" -ForegroundColor Cyan
     @{Name = "DcomLaunch"; DisplayName = "DCOM Server Process Launcher"},
     @{Name = "PlugPlay"; DisplayName = "Plug and Play"},
     @{Name = "wsearch"; DisplayName = "Windows Search"},
-    @{Name = "WinDefend"; DisplayName = "Windows Defender"} # Added Defender
+    @{Name = "WinDefend"; DisplayName = "Windows Defender"}
 )
 
 foreach ($svc in $services) {
@@ -74,7 +73,7 @@ foreach ($svc in $services) {
             if ($displayName.Length -gt 40) {
                 $displayName = $displayName.Substring(0, 37) + "..."
             }
-            Write-Host ("  {0,-12} {1,-40}" -f $svc.Name, $displayName) -ForegroundColor Green -NoNewline
+            Write-Host ("  {0,-12} {1,-40}" -f $svc.Name, $displayName) -ForegroundColor Cyan -NoNewline
             
             if ($svc.Name -eq "Bam") {
                 Write-Host " | Enabled" -ForegroundColor Yellow
@@ -107,7 +106,7 @@ foreach ($svc in $services) {
     }
 }
 
-Write-Host "`nREGISTRY" -ForegroundColor Cyan
+Write-Host "`nREGISTRY" -ForegroundColor Magenta
 
  $settings = @(
     @{ Name = "CMD"; Path = "HKCU:\Software\Policies\Microsoft\Windows\System"; Key = "DisableCMD"; Warning = "Disabled"; Safe = "Available" },
@@ -124,7 +123,7 @@ foreach ($s in $settings) {
         Write-Host "$($s.Warning)" -ForegroundColor Red
     } else {
         Write-Host "$($s.Name): " -NoNewline -ForegroundColor White
-        Write-Host "$($s.Safe)" -ForegroundColor Green
+        Write-Host "$($s.Safe)" -ForegroundColor Cyan
     }
 }
 
@@ -135,7 +134,7 @@ function Check-EventLog {
         Write-Host "  $message at: " -NoNewline -ForegroundColor White
         Write-Host $event.TimeCreated.ToString("MM/dd HH:mm") -ForegroundColor Yellow
     } else {
-        Write-Host "  $message - No records found" -ForegroundColor Green
+        Write-Host "  $message - No records found" -ForegroundColor Cyan
     }
 }
 
@@ -146,7 +145,7 @@ function Check-RecentEventLog {
         Write-Host "  $message (ID: $($event.Id)) at: " -NoNewline -ForegroundColor White
         Write-Host $event.TimeCreated.ToString("MM/dd HH:mm") -ForegroundColor Yellow
     } else {
-        Write-Host "  $message - No records found" -ForegroundColor Green
+        Write-Host "  $message - No records found" -ForegroundColor Cyan
     }
 }
 
@@ -178,10 +177,10 @@ function Check-DeviceDeleted {
         }
     } catch {}
 
-    Write-Host "  Device changes - No records found" -ForegroundColor Green
+    Write-Host "  Device changes - No records found" -ForegroundColor Cyan
 }
 
-Write-Host "`nEVENT LOGS" -ForegroundColor Cyan
+Write-Host "`nEVENT LOGS" -ForegroundColor Magenta
 
 Check-EventLog "Application" 3079 "USN Journal cleared"
 Check-RecentEventLog "System" @(104, 1102) "Event Logs cleared"
@@ -193,7 +192,7 @@ Check-DeviceDeleted
 
  $prefetchPath = "$env:SystemRoot\Prefetch"
 if (Test-Path $prefetchPath) {
-    Write-Host "`nPREFETCH INTEGRITY" -ForegroundColor Cyan
+    Write-Host "`nPREFETCH INTEGRITY" -ForegroundColor Magenta
     
     $files = Get-ChildItem -Path $prefetchPath -Filter *.pf -Force -ErrorAction SilentlyContinue
     if (-not $files) {
@@ -260,7 +259,7 @@ if (Test-Path $prefetchPath) {
                 Write-Host ("    {0}" -f $file.Name) -ForegroundColor White
             }
         } else {
-            Write-Host "  Hidden Files: None" -ForegroundColor Green
+            Write-Host "  Hidden Files: None" -ForegroundColor Cyan
         }
 
         if ($readOnlyFiles.Count -gt 0) {
@@ -269,7 +268,7 @@ if (Test-Path $prefetchPath) {
                 Write-Host ("    {0}" -f $file.Name) -ForegroundColor White
             }
         } else {
-            Write-Host "  Read-Only Files: None" -ForegroundColor Green
+            Write-Host "  Read-Only Files: None" -ForegroundColor Cyan
         }
 
         $repeatedHashes = $hashTable.GetEnumerator() | Where-Object { $_.Value.Count -gt 1 }
@@ -284,7 +283,7 @@ if (Test-Path $prefetchPath) {
                 Write-Host ("    Duplicate set: {0}" -f ($entry.Value -join ", ")) -ForegroundColor White
             }
         } else {
-            Write-Host "  Duplicates: None" -ForegroundColor Green
+            Write-Host "  Duplicates: None" -ForegroundColor Cyan
         }
 
         if ($suspiciousFiles.Count -gt 0) {
@@ -293,7 +292,7 @@ if (Test-Path $prefetchPath) {
                 Write-Host ("    {0} : {1}" -f $entry.Key, $entry.Value) -ForegroundColor White
             }
         } else {
-            Write-Host "`n  Prefetch integrity: Clean ($totalFiles files checked)" -ForegroundColor Green
+            Write-Host "`n  Prefetch integrity: Clean ($totalFiles files checked)" -ForegroundColor Cyan
         }
     }
 } else {
@@ -303,7 +302,7 @@ if (Test-Path $prefetchPath) {
 try {
     $recycleBinPath = "$env:SystemDrive" + '\$Recycle.Bin'
     
-    Write-Host "`nRecycle Bin" -ForegroundColor Cyan
+    Write-Host "`nRecycle Bin" -ForegroundColor Magenta
 
     if (Test-Path $recycleBinPath) {
         $recycleBinFolder = Get-Item -LiteralPath $recycleBinPath -Force
@@ -341,13 +340,13 @@ try {
                 Write-Host $latestItem.Name -ForegroundColor Gray
             } else {
                 Write-Host "  Status: " -NoNewline -ForegroundColor White
-                Write-Host "Folders present but empty" -ForegroundColor Green
+                Write-Host "Folders present but empty" -ForegroundColor Cyan
             }
         } else {
             Write-Host "  Status: " -NoNewline -ForegroundColor White
-            Write-Host "Emptyy" -ForegroundColor Green
+            Write-Host "Emptyy" -ForegroundColor Cyan
             Write-Host "  Last Modified: " -NoNewline -ForegroundColor White
-            Write-Host $recycleBinFolder.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss") -ForegroundColor Green
+            Write-Host $recycleBinFolder.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss") -ForegroundColor Cyan
         }
         
         $clearEvent = Get-WinEvent -FilterHashtable @{LogName="System"; Id=10006} -MaxEvents 1 -ErrorAction SilentlyContinue
@@ -362,7 +361,7 @@ try {
 
 
     $consoleHistoryPath = "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt"
-    Write-Host "`n  Console Host History:" -ForegroundColor Cyan
+    Write-Host "`n  Console Host History:" -ForegroundColor Magenta
     
     if (Test-Path $consoleHistoryPath) {
         $historyFile = Get-Item -Path $consoleHistoryPath -Force
@@ -375,7 +374,7 @@ try {
             Write-Host "    Attributes: " -NoNewline -ForegroundColor White
             Write-Host $attributes -ForegroundColor Yellow
         } else {
-            Write-Host "    Attributes: Normal" -ForegroundColor Green
+            Write-Host "    Attributes: Normal" -ForegroundColor Cyan
         }
         
 
@@ -392,8 +391,7 @@ try {
     Write-Host "  Error accessing system information: $($_.Exception.Message)" -ForegroundColor Red
 }
 
-# --- NEW: UPDATES & BIOS ---
-Write-Host "`nWINDOWS UPDATES (Last 5)" -ForegroundColor Cyan
+Write-Host "`nWINDOWS UPDATES (Last 5)" -ForegroundColor Magenta
 try {
     $updates = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 5
     if ($updates) {
@@ -407,14 +405,40 @@ try {
     Write-Host "  Unable to retrieve updates." -ForegroundColor Red
 }
 
-Write-Host "`nBIOS INFO" -ForegroundColor Cyan
+Write-Host "`nBIOS INFO" -ForegroundColor Magenta
 try {
     $bios = Get-CimInstance Win32_BIOS
     Write-Host ("  {0,-20} : {1}" -f "Manufacturer", $bios.Manufacturer) -ForegroundColor White
     Write-Host ("  {0,-20} : {1}" -f "Serial Number", $bios.SerialNumber) -ForegroundColor White
-    Write-Host ("  {0,-20} : {1}" -f "Version", $bios.SMBIOSBIOSVersion) -ForegroundColor White
+    Write-Host ("  {0,-20} : {1}" -f "Version", $bios.SMBIOSBIOSVersion) -ForegroundColor Cyan
 } catch {
     Write-Host "  Unable to retrieve BIOS info." -ForegroundColor Red
 }
 
-Write-Host "`nCheck Complete, hit up @praiselily if u run into any issues." -ForegroundColor Cyan
+# --- NEW: GPU INFO ---
+Write-Host "`nVIDEO CARD (GPU)" -ForegroundColor Magenta
+try {
+    $gpu = Get-CimInstance Win32_VideoController
+    Write-Host ("  Name : {0}" -f $gpu.Name) -ForegroundColor White
+    $vram = [math]::Round($gpu.AdapterRAM / 1GB, 2)
+    Write-Host ("  VRAM : {0} GB" -f $vram) -ForegroundColor Cyan
+} catch {
+    Write-Host "  Unable to retrieve GPU info." -ForegroundColor Red
+}
+
+# --- NEW: MOTHERBOARD INFO ---
+Write-Host "`nMOTHERBOARD" -ForegroundColor Magenta
+try {
+    $mobo = Get-CimInstance Win32_BaseBoard
+    Write-Host ("  Manufacturer : {0}" -f $mobo.Manufacturer) -ForegroundColor White
+    Write-Host ("  Product      : {0}" -f $mobo.Product) -ForegroundColor Cyan
+} catch {
+    Write-Host "  Unable to retrieve Motherboard info." -ForegroundColor Red
+}
+
+# --- NEW: ENVIRONMENT VARIABLES ---
+Write-Host "`nENVIRONMENT VARIABLES" -ForegroundColor Magenta
+Write-Host ("  TEMP  : {0}" -f $env:TEMP) -ForegroundColor White
+Write-Host ("  TMP   : {0}" -f $env:TMP) -ForegroundColor Cyan
+
+Write-Host "`nCheck Complete, hit up @Nic if u run into any issues." -ForegroundColor Magenta
