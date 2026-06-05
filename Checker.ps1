@@ -20,14 +20,13 @@ try {
     Write-Host "Unable to retrieve boot time information" -ForegroundColor Red
 }
 
-# --- NETWORK INFO (IP Removed) ---
+# --- NETWORK INFO (IP & Gateway Removed) ---
 Write-Host "`nNETWORK ADAPTERS" -ForegroundColor Magenta
 try {
     $adapters = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null }
     if ($adapters) {
         foreach ($adapter in $adapters) {
             Write-Host ("  {0,-20} : {1}" -f "Interface", $adapter.InterfaceAlias) -ForegroundColor White
-            Write-Host ("  {0,-20} : {1}" -f "Gateway", ($adapter.IPv4DefaultGateway.NextHop)) -ForegroundColor Cyan
             Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
         }
     } else {
@@ -461,12 +460,12 @@ Write-Host "`nRECENT FOLDER ACTIVITY (Last 10 Mins)" -ForegroundColor Magenta
 Write-Host "  Scanning user directories..." -ForegroundColor DarkGray
 try {
     $cutoff = (Get-Date).AddMinutes(-10)
-    $searchPaths = @("$env:USERPROFILE", "$env:PUBLIC", "$env:PROGRAMDATA")
+    $searchPaths = @("$env:USERPROFILE", "$env:PUBLIC")
     $activeFolders = @()
     
     foreach ($path in $searchPaths) {
          if (Test-Path $path) {
-             # Limit depth slightly to avoid system32 hanging
+             # Scan recursively
              $folders = Get-ChildItem $path -Recurse -Directory -ErrorAction SilentlyContinue
              $recent = $folders | Where-Object { $_.LastWriteTime -gt $cutoff }
              $activeFolders += $recent
@@ -474,10 +473,25 @@ try {
     }
 
     if ($activeFolders) {
-         $top5 = $activeFolders | Sort-Object LastWriteTime -Descending | Select-Object -First 5
-         foreach ($f in $top5) {
-             Write-Host ("  Path: {0}" -f $f.FullName) -ForegroundColor Cyan
-             Write-Host ("    Modified: {0}" -f $f.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
+         # Exclude noise: AppData, Temp, Windows, ProgramData
+         $noisePatterns = @("*AppData*", "*Temp*", "*Windows*", "*ProgramData*")
+         
+         $cleanList = $activeFolders | Where-Object {
+             $isNoise = $false
+             foreach ($pattern in $noisePatterns) {
+                 if ($_.FullName -like $pattern) { $isNoise = $true; break }
+             }
+             -not $isNoise
+         }
+
+         if ($cleanList) {
+            $top5 = $cleanList | Sort-Object LastWriteTime -Descending | Select-Object -First 5
+            foreach ($f in $top5) {
+                Write-Host ("  Path: {0}" -f $f.FullName) -ForegroundColor Cyan
+                Write-Host ("    Modified: {0}" -f $f.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
+            }
+         } else {
+            Write-Host "  Only system folder activity detected (noise filtered)." -ForegroundColor Gray
          }
     } else {
          Write-Host "  No folders modified in the last 10 minutes." -ForegroundColor Gray
