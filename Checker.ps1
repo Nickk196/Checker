@@ -436,9 +436,54 @@ try {
     Write-Host "  Unable to retrieve Motherboard info." -ForegroundColor Red
 }
 
-# --- NEW: ENVIRONMENT VARIABLES ---
-Write-Host "`nENVIRONMENT VARIABLES" -ForegroundColor Magenta
-Write-Host ("  TEMP  : {0}" -f $env:TEMP) -ForegroundColor White
-Write-Host ("  TMP   : {0}" -f $env:TMP) -ForegroundColor Cyan
+# --- NEW: TEMP FOLDER STATUS ---
+Write-Host "`nTEMP FOLDER STATUS" -ForegroundColor Magenta
+try {
+    $tempPath = $env:TEMP
+    if (Test-Path $tempPath) {
+        $tempInfo = Get-Item $tempPath
+        Write-Host ("  Location       : {0}" -f $tempPath) -ForegroundColor Gray
+        Write-Host ("  Last Write     : {0}" -f $tempInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
+        Write-Host ("  Last Access    : {0}" -f $tempInfo.LastAccessTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
+        
+        # Check Recycle Bin for recently deleted temp files
+        $deletedTemps = Get-ChildItem "$env:SystemDrive\`$Recycle.Bin" -Recurse -Filter "*.tmp" -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-1) }
+        if ($deletedTemps) {
+            Write-Host ("  Recent Deletions: {0} .tmp files in Recycle Bin" -f $deletedTemps.Count) -ForegroundColor Red
+        }
+    }
+} catch {
+    Write-Host "  Unable to retrieve Temp folder info." -ForegroundColor Red
+}
+
+# --- NEW: RECENT FOLDER ACTIVITY (LAST 10 MINS) ---
+Write-Host "`nRECENT FOLDER ACTIVITY (Last 10 Mins)" -ForegroundColor Magenta
+Write-Host "  Scanning user directories..." -ForegroundColor DarkGray
+try {
+    $cutoff = (Get-Date).AddMinutes(-10)
+    $searchPaths = @("$env:USERPROFILE", "$env:PUBLIC", "$env:PROGRAMDATA")
+    $activeFolders = @()
+    
+    foreach ($path in $searchPaths) {
+         if (Test-Path $path) {
+             # Limit depth slightly to avoid system32 hanging
+             $folders = Get-ChildItem $path -Recurse -Directory -ErrorAction SilentlyContinue
+             $recent = $folders | Where-Object { $_.LastWriteTime -gt $cutoff }
+             $activeFolders += $recent
+         }
+    }
+
+    if ($activeFolders) {
+         $top5 = $activeFolders | Sort-Object LastWriteTime -Descending | Select-Object -First 5
+         foreach ($f in $top5) {
+             Write-Host ("  Path: {0}" -f $f.FullName) -ForegroundColor Cyan
+             Write-Host ("    Modified: {0}" -f $f.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")) -ForegroundColor White
+         }
+    } else {
+         Write-Host "  No folders modified in the last 10 minutes." -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "  Error scanning folder activity." -ForegroundColor Red
+}
 
 Write-Host "`nCheck Complete, hit up @Nic if u run into any issues." -ForegroundColor Magenta
